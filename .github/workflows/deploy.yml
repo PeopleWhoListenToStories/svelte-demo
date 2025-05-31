@@ -1,0 +1,62 @@
+name: Build and Push to Aliyun ACR
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  REGISTRY: registry.ap-southeast-1.aliyuncs.com
+  REPOSITORY: aliyun-kit/svelte-demo
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v3
+
+    - name: Set up pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: latest
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+        cache: pnpm
+
+    - name: Log in to Aliyun Container Registry (ACR)
+      run: |
+        echo "${{ secrets.ALIYUN_PASSWORD }}" | docker login $REGISTRY \
+          -u "${{ secrets.ALIYUN_USERNAME }}" --password-stdin
+
+    - name: Install deps and build static site
+      run: |
+        pnpm install
+        pnpm build
+
+    - name: Build Docker image
+      run: |
+        docker build -f ./docker/prod/Dockerfile -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+
+    - name : Tag Docker image
+      run: |
+        docker tag $REGISTRY/$REPOSITORY:$IMAGE_TAG $REGISTRY/$REPOSITORY:latest
+
+    - name: Push Docker image
+      run: |
+        docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+        docker push $REGISTRY/$REPOSITORY:latest
+
+    - name: Deploy to Kubernetes on remote server
+      uses: appleboy/ssh-action@v0.1.9
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        password: ${{ secrets.SSH_PASSWORD }}
+        script: |
+          bash /app/scripts/deploy-svelte-demo.sh
