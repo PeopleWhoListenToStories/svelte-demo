@@ -28,7 +28,7 @@ export default defineConfig({
     // Terser 压缩选项
     terserOptions: {
       compress: {
-        drop_console: true,  // 移除所有console.log
+        drop_console: false,  // 移除所有console.log
         drop_debugger: true, // 移除debugger
         pure_funcs: ['console.info', 'console.debug'] // 移除特定console方法
       },
